@@ -2,7 +2,8 @@ import os
 from collections import defaultdict
 from pathlib import Path
 
-from mutagen.id3 import ID3
+from chardet import detect
+from mutagen.easyid3 import EasyID3
 
 
 class MetaFixer:
@@ -12,8 +13,16 @@ class MetaFixer:
         else:
             self.folder_path = folder_path
         self.files = None
+        self.metadata_original = None
+        self.metadata_fixed = None
 
-    def _get_files(self) -> bool:
+    @staticmethod
+    def _fix_encoding(text: str) -> str:
+        # Detect encoding of text
+        in_encoding = detect(text)
+        pass
+
+    def get_files(self) -> bool:
         """Method to walk through the parent folder and retrieve all audio
         files.
 
@@ -37,19 +46,34 @@ class MetaFixer:
 
         return len(files) > 0
 
-    def _extract_metadata(self, file_path: Path):
-        audio = ID3(file_path)
-        for tag in audio.values():
-            try:
-                print(tag.FrameID, tag.text)
-            except AttributeError:
-                continue
+    def _extract_metadata(self, file_path: Path) -> dict:
+        audio = EasyID3(file_path)
+        keys = ("album", "title", "artist", "genre")
 
-    def run(self):
-        self._get_files()
+        meta = {}
+        for key in keys:
+            if key in audio:
+                meta[key] = audio[key][0]
+            else:
+                meta[key] = None
+
+        return meta
+
+    def get_original_metadata(self) -> bool:
+        meta = defaultdict(dict)
         for folder, files in self.files.items():
             for file in files:
-                self._extract_metadata(file.key)
+                f_meta = self._extract_metadata(file)
+                meta[file] = f_meta
+
+        self.metadata_original = dict(meta)
+
+        return len(meta) > 0
+
+    def run(self):
+        # Get files and their original metadata
+        if self.get_files():
+            self.get_original_metadata()
 
 
 if __name__ == "__main__":
