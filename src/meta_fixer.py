@@ -18,9 +18,39 @@ class MetaFixer:
 
     @staticmethod
     def _fix_encoding(text: str) -> str:
-        # Detect encoding of text
-        in_encoding = detect(text)
-        pass
+        try:
+            # Step 1: Get raw bytes by encoding with Latin-1 (1:1 byte map)
+            raw_bytes = text.encode("latin1")
+        except UnicodeEncodeError:
+            return None
+
+        # Try encoding detection with chardet
+        detected = detect(raw_bytes)
+        enc = detected["encoding"]
+        confidence = detected["confidence"]
+
+        # If chardet is confident enough, try decoding with it
+        if enc and confidence > 0.7:
+            try:
+                return raw_bytes.decode(enc)
+            except UnicodeDecodeError:
+                pass
+
+        # TODO: Get encoding with maximum confidence?
+        # Fallback: Try a list of known East Asian encodings
+        for candidate in [
+            "cp949",
+            "euc-kr",
+            "shift_jis",
+            "euc_jp",
+            "iso2022_jp",
+        ]:
+            try:
+                return raw_bytes.decode(candidate)
+            except UnicodeDecodeError:
+                continue
+
+        return None
 
     def get_files(self) -> bool:
         """Method to walk through the parent folder and retrieve all audio
@@ -74,6 +104,8 @@ class MetaFixer:
         # Get files and their original metadata
         if self.get_files():
             self.get_original_metadata()
+
+        print(self._fix_encoding("üåª¨ªÊª¤íþª¤ìíèøìí"))
 
 
 if __name__ == "__main__":
