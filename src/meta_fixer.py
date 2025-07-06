@@ -17,12 +17,28 @@ class MetaFixer:
         self.metadata_fixed = None
 
     @staticmethod
+    def _is_garbled(text: str) -> bool:
+        # If it contains printable ASCII or odd punctuation but few CJK chars
+        if not any(
+            "\u3040" <= c <= "\u30ff"  # Japanese
+            or "\u4e00" <= c <= "\u9fff"  # CJK Unified Ideographs
+            or "\uac00" <= c <= "\ud7a3"  # Korean Hangul
+            for c in text
+        ):
+            return True
+        return False
+
+    @staticmethod
     def _fix_encoding(text: str) -> str:
         try:
-            # Step 1: Get raw bytes by encoding with Latin-1 (1:1 byte map)
+            # If the string looks good, return it as is
+            if not MetaFixer._is_garbled(text):
+                return text
+            # Get raw bytes assuming text is incorrectly decoded from latin1
             raw_bytes = text.encode("latin1")
         except UnicodeEncodeError:
-            return None
+            # If not Latin1-compatible, assume it's fine
+            return text
 
         # Try encoding detection with chardet
         detected = detect(raw_bytes)
@@ -30,13 +46,12 @@ class MetaFixer:
         confidence = detected["confidence"]
 
         # If chardet is confident enough, try decoding with it
-        if enc and confidence > 0.7:
+        if enc and confidence > 0.8:
             try:
                 return raw_bytes.decode(enc)
             except UnicodeDecodeError:
                 pass
 
-        # TODO: Get encoding with maximum confidence?
         # Fallback: Try a list of known East Asian encodings
         for candidate in [
             "cp949",
@@ -100,12 +115,25 @@ class MetaFixer:
 
         return len(meta) > 0
 
+    def fix_extracted_metadata(self) -> bool:
+        fixed_meta = defaultdict(dict)
+        for file, metadata in self.metadata_original.items():
+            fixed = {
+                tag: self._fix_encoding(value)
+                for tag, value in metadata.items()
+            }
+            fixed_meta[file] = fixed
+
+        self.metadata_fixed = dict(fixed_meta)
+
+        return True
+
     def run(self):
         # Get files and their original metadata
         if self.get_files():
             self.get_original_metadata()
-
-        print(self._fix_encoding("üåª¨ªÊª¤íþª¤ìíèøìí"))
+        self.fix_extracted_metadata()
+        pass
 
 
 if __name__ == "__main__":
