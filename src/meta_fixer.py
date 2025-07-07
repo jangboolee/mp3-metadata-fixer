@@ -1,5 +1,6 @@
 import os
 from collections import defaultdict
+from csv import DictWriter
 from pathlib import Path
 
 from chardet import detect
@@ -18,18 +19,37 @@ class MetaFixer:
 
     @staticmethod
     def _is_garbled(text: str) -> bool:
+        """Helper static method to detect if a string is garbled or not.
+
+        Args:
+            text (str): Input string to run detection for.
+
+        Returns:
+            bool: True if the text is garbled, False if not.
+        """
+
         # If it contains printable ASCII or odd punctuation but few CJK chars
-        if not any(
+        return any(
             "\u3040" <= c <= "\u30ff"  # Japanese
             or "\u4e00" <= c <= "\u9fff"  # CJK Unified Ideographs
             or "\uac00" <= c <= "\ud7a3"  # Korean Hangul
             for c in text
-        ):
-            return True
-        return False
+        )
 
     @staticmethod
     def _fix_encoding(text: str) -> str:
+        """Helper static method to fix character encoding issues of a string.
+
+        Args:
+            text (str): Input string to fix encoding issues for.
+
+        Returns:
+            str: Fixed version of the string.
+        """
+
+        if not text:
+            return None
+
         try:
             # If the string looks good, return it as is
             if not MetaFixer._is_garbled(text):
@@ -92,6 +112,15 @@ class MetaFixer:
         return len(files) > 0
 
     def _extract_metadata(self, file_path: Path) -> dict:
+        """Helper method to extract the key audio metadata for a single file.
+
+        Args:
+            file_path (Path): Path of the audio file.
+
+        Returns:
+            dict: Extracted metadata of the audio file.
+        """
+
         audio = EasyID3(file_path)
         keys = ("album", "title", "artist", "genre")
 
@@ -105,6 +134,14 @@ class MetaFixer:
         return meta
 
     def get_original_metadata(self) -> bool:
+        """Method to extract the metadata of all files.
+
+        Returns:
+            bool: True if metadata is extracted for more than 1 file.
+        """
+
+        print("Extracting metadata...")
+
         meta = defaultdict(dict)
         for folder, files in self.files.items():
             for file in files:
@@ -116,15 +153,72 @@ class MetaFixer:
         return len(meta) > 0
 
     def fix_extracted_metadata(self) -> bool:
+        """Method to fix the extracted metadata of audio files.
+
+        Returns:
+            bool: True after completion.
+        """
+
+        print("Fixing metadata...")
+
         fixed_meta = defaultdict(dict)
         for file, metadata in self.metadata_original.items():
-            fixed = {
-                tag: self._fix_encoding(value)
-                for tag, value in metadata.items()
-            }
+            # Open the audio file
+            audio = EasyID3(file)
+            fixed = {}
+            for tag, value in metadata.items():
+                # Fix encoding of the tag
+                fixed_val = self._fix_encoding(value)
+                # Save the fixed tag value
+                fixed[tag] = fixed_val
+                # Update the file's metadata tag
+                audio[tag] = fixed_val
+            # Save the fixed metadata results
             fixed_meta[file] = fixed
+            audio.save()
 
         self.metadata_fixed = dict(fixed_meta)
+
+        return True
+
+    def output_results(self) -> bool:
+        """Method to output the results of the fixing in a simple CSV file.
+
+        Returns:
+            bool: True after completion.
+        """
+
+        field_names = (
+            "file_path",
+            "artist_og",
+            "artist_fixed",
+            "title_og",
+            "title_fixed",
+            "album_og",
+            "album_fixed",
+            "genre_og",
+            "genre_fixed",
+        )
+
+        # Write the results of the metadata fixing to a CSV file
+        with open("results.csv", "w", newline="") as f:
+            writer = DictWriter(f, fieldnames=field_names)
+            writer.writeheader()
+
+            for f_path, meta_og in self.metadata_original.items():
+                row = {}
+                # Extract original metadata to write into row
+                for tag, value in meta_og.items():
+                    og_tag = f"{tag}_og"
+                    row[og_tag] = value
+                # Extract fixed metadata to write into row
+                for tag, value in self.metadata_fixed[f_path].items():
+                    fixed_tag = f"{tag}_fixed"
+                    row[fixed_tag] = value
+                # Save filepath for row
+                row["file_path"] = f_path
+                # Write row into result file
+                writer.writerow(row)
 
         return True
 
@@ -132,11 +226,12 @@ class MetaFixer:
         # Get files and their original metadata
         if self.get_files():
             self.get_original_metadata()
+        # Fix metadata of the retrieved files
         self.fix_extracted_metadata()
-        pass
+        # Give output CSV of results
+        self.output_results()
 
 
 if __name__ == "__main__":
     fixer = MetaFixer()
     fixer.run()
-    pass
