@@ -223,6 +223,8 @@ class MetaFixer:
         return True
 
     def run(self):
+        """Main method to call all main methods of the MetaFixer class"""
+
         # Get files and their original metadata
         if self.get_files():
             self.get_original_metadata()
