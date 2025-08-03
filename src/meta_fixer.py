@@ -127,7 +127,7 @@ class MetaFixer:
 
         meta = defaultdict(dict)
         for folder, files in self.files.items():
-            for file in files:
+            for file in tqdm(files):
                 f_meta = self._extract_metadata(file)
                 # If metadata extraction was successful
                 if f_meta:
