@@ -4,7 +4,9 @@ from csv import DictWriter
 from pathlib import Path
 
 from chardet import detect
+from mutagen import id3
 from mutagen.easyid3 import EasyID3
+from tqdm import tqdm
 
 
 class MetaFixer:
@@ -99,17 +101,20 @@ class MetaFixer:
             dict: Extracted metadata of the audio file.
         """
 
-        audio = EasyID3(file_path)
-        keys = ("album", "title", "artist", "genre")
+        try:
+            audio = EasyID3(file_path)
+            keys = ("album", "title", "artist", "genre")
 
-        meta = {}
-        for key in keys:
-            if key in audio:
-                meta[key] = audio[key][0]
-            else:
-                meta[key] = None
+            meta = {}
+            for key in keys:
+                if key in audio:
+                    meta[key] = audio[key][0]
+                else:
+                    meta[key] = None
 
-        return meta
+            return meta
+        except id3._util.ID3NoHeaderError:
+            return None
 
     def get_original_metadata(self) -> bool:
         """Method to extract the metadata of all files.
@@ -124,7 +129,9 @@ class MetaFixer:
         for folder, files in self.files.items():
             for file in files:
                 f_meta = self._extract_metadata(file)
-                meta[file] = f_meta
+                # If metadata extraction was successful
+                if f_meta:
+                    meta[file] = f_meta
 
         self.metadata_original = dict(meta)
 
@@ -140,7 +147,7 @@ class MetaFixer:
         print("Fixing metadata...")
 
         fixed_meta = defaultdict(dict)
-        for file, metadata in self.metadata_original.items():
+        for file, metadata in tqdm(self.metadata_original.items()):
             # Open the audio file
             audio = EasyID3(file)
             fixed = {}
