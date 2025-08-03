@@ -18,25 +18,6 @@ class MetaFixer:
         self.metadata_fixed = None
 
     @staticmethod
-    def _is_garbled(text: str) -> bool:
-        """Helper static method to detect if a string is garbled or not.
-
-        Args:
-            text (str): Input string to run detection for.
-
-        Returns:
-            bool: True if the text is garbled, False if not.
-        """
-
-        # If it contains printable ASCII or odd punctuation but few CJK chars
-        return any(
-            "\u3040" <= c <= "\u30ff"  # Japanese
-            or "\u4e00" <= c <= "\u9fff"  # CJK Unified Ideographs
-            or "\uac00" <= c <= "\ud7a3"  # Korean Hangul
-            for c in text
-        )
-
-    @staticmethod
     def _fix_encoding(text: str) -> str:
         """Helper static method to fix character encoding issues of a string.
 
@@ -51,9 +32,6 @@ class MetaFixer:
             return None
 
         try:
-            # If the string looks good, return it as is
-            if not MetaFixer._is_garbled(text):
-                return text
             # Get raw bytes assuming text is incorrectly decoded from latin1
             raw_bytes = text.encode("latin1")
         except UnicodeEncodeError:
@@ -201,7 +179,7 @@ class MetaFixer:
         )
 
         # Write the results of the metadata fixing to a CSV file
-        with open("results.csv", "w", newline="") as f:
+        with open("results.csv", "w", encoding="utf-8", newline="") as f:
             writer = DictWriter(f, fieldnames=field_names)
             writer.writeheader()
 
