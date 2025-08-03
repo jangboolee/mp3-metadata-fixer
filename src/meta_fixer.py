@@ -152,12 +152,15 @@ class MetaFixer:
             audio = EasyID3(file)
             fixed = {}
             for tag, value in metadata.items():
-                # Fix encoding of the tag
-                fixed_val = self._fix_encoding(value)
-                # Save the fixed tag value
-                fixed[tag] = fixed_val
-                # Update the file's metadata tag
-                audio[tag] = fixed_val
+                try:
+                    # Fix encoding of the tag
+                    fixed_val = self._fix_encoding(value)
+                    # Save the fixed tag value
+                    fixed[tag] = fixed_val
+                    # Update the file's metadata tag
+                    audio[tag] = fixed_val
+                except Exception:
+                    continue
             # Save the fixed metadata results
             fixed_meta[file] = fixed
             audio.save()
