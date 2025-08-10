@@ -1,5 +1,4 @@
 import os
-from collections import defaultdict
 from csv import DictWriter
 from pathlib import Path
 
@@ -15,9 +14,11 @@ class MetaFixer:
             self.folder_path = Path(".") / "files"
         else:
             self.folder_path = folder_path
-        self.files = None
-        self.metadata_original = None
-        self.metadata_fixed = None
+        self.file_paths = None
+        self.metadata = None
+
+        # Keys of metadata to extract
+        self.keys = ("album", "title", "artist", "genre")
 
     @staticmethod
     def _fix_encoding(text: str) -> str:
@@ -67,7 +68,7 @@ class MetaFixer:
 
         return None
 
-    def get_files(self) -> bool:
+    def _get_files(self) -> bool:
         """Method to walk through the parent folder and retrieve all audio
         files.
 
@@ -75,99 +76,74 @@ class MetaFixer:
             bool: True if more than one file has been found.
         """
 
-        # Walk through the root folder and retrieve all audio files
+        # Get full path of all files in the file folder
         all_files = [
-            (dirs[0], file)
-            for dirs in os.walk(self.folder_path)
-            for file in dirs[2]
+            self.folder_path / f for f in os.listdir(self.folder_path)
         ]
+        # Create and save dictionary of metadata
+        metadata = {
+            f_path: {"original": None, "fixed": None} for f_path in all_files
+        }
+        # Save as instance variables
+        self.file_paths = all_files
+        self.metadata = metadata
 
-        # Merge files per each subdirectory
-        files = defaultdict(list)
-        for folder, file in all_files:
-            file_path = self.folder_path / os.path.split(folder)[1] / file
-            files[folder].append(file_path)
-        self.files = dict(files)
+        return len(all_files) > 0
 
-        return len(files) > 0
+    def _extract_metadata(self, f_path: Path, audio: EasyID3) -> dict:
+        # Extract original metadata
+        meta = {}
+        for key in self.keys:
+            if key in audio:
+                meta[key] = audio[key][0]
+            else:
+                meta[key] = None
+        # Save extracted metadata
+        self.metadata[f_path]["original"] = meta
 
-    def _extract_metadata(self, file_path: Path) -> dict:
-        """Helper method to extract the key audio metadata for a single file.
+        return meta
 
-        Args:
-            file_path (Path): Path of the audio file.
-
-        Returns:
-            dict: Extracted metadata of the audio file.
-        """
-
-        try:
-            audio = EasyID3(file_path)
-            keys = ("album", "title", "artist", "genre")
-
-            meta = {}
-            for key in keys:
-                if key in audio:
-                    meta[key] = audio[key][0]
-                else:
-                    meta[key] = None
-
-            return meta
-        except id3._util.ID3NoHeaderError:
-            return None
-
-    def get_original_metadata(self) -> bool:
-        """Method to extract the metadata of all files.
-
-        Returns:
-            bool: True if metadata is extracted for more than 1 file.
-        """
-
-        print("Extracting metadata...")
-
-        meta = defaultdict(dict)
-        for folder, files in self.files.items():
-            for file in tqdm(files):
-                f_meta = self._extract_metadata(file)
-                # If metadata extraction was successful
-                if f_meta:
-                    meta[file] = f_meta
-
-        self.metadata_original = dict(meta)
-
-        return len(meta) > 0
-
-    def fix_extracted_metadata(self) -> bool:
-        """Method to fix the extracted metadata of audio files.
-
-        Returns:
-            bool: True after completion.
-        """
-
-        print("Fixing metadata...")
-
-        fixed_meta = defaultdict(dict)
-        for file, metadata in tqdm(self.metadata_original.items()):
-            # Open the audio file
-            audio = EasyID3(file)
-            fixed = {}
-            for tag, value in metadata.items():
-                # Fix encoding of the tag
-                fixed_val = self._fix_encoding(value)
+    def _fix_metadata(self, f_path: Path, meta: dict, audio: EasyID3) -> bool:
+        is_fixed = False
+        fixed_meta = {}
+        for tag, value in meta.items():
+            # Fix encoding of the tag
+            fixed_val = self._fix_encoding(value)
+            # If the fix attempt was successful
+            if fixed_val:
                 # Save the fixed tag value
-                fixed[tag] = fixed_val
-                # Update the file's metadata tag
-                if fixed_val:
+                fixed_meta[tag] = fixed_val
+                # If a corrupted metadata was fixed
+                if fixed_val != value:
+                    # Update the file's metadata tag
                     audio[tag] = fixed_val
-            # Save the fixed metadata results
-            fixed_meta[file] = fixed
-            audio.save()
+                    # Update the boolean tracker
+                    is_fixed = True
+        # Save the fixed metadata results
+        self.metadata[f_path]["fixed"] = fixed_meta
+        # Save the audio file with fixed metadta
+        audio.save()
 
-        self.metadata_fixed = dict(fixed_meta)
+        return is_fixed
 
-        return True
+    def _fix_files(self) -> int:
+        fixed_count = 0
+        for f_path in tqdm(self.file_paths):
+            try:
+                # Try opening the file in mutagen
+                audio = EasyID3(f_path)
+                # Extract the original metdata
+                meta = self._extract_metadata(f_path, audio)
+                # Fix extracted metadata
+                fixed = self._fix_metadata(f_path, meta, audio)
+                if fixed:
+                    fixed_count += 1
+            except id3._util.ID3NoHeaderError:
+                pass
 
-    def output_results(self) -> bool:
+        return fixed_count
+
+    def _output_results(self) -> bool:
         """Method to output the results of the fixing in a simple CSV file.
 
         Returns:
@@ -191,16 +167,20 @@ class MetaFixer:
             writer = DictWriter(f, fieldnames=field_names)
             writer.writeheader()
 
-            for f_path, meta_og in self.metadata_original.items():
+            for f_path, meta_dict in self.metadata.items():
                 row = {}
-                # Extract original metadata to write into row
-                for tag, value in meta_og.items():
-                    og_tag = f"{tag}_og"
-                    row[og_tag] = value
-                # Extract fixed metadata to write into row
-                for tag, value in self.metadata_fixed[f_path].items():
-                    fixed_tag = f"{tag}_fixed"
-                    row[fixed_tag] = value
+                og, fixed = meta_dict["original"], meta_dict["fixed"]
+                # If the file had no embedded metadata
+                if og is None:
+                    # Default all fields to None
+                    for field_name in field_names:
+                        row[field_name] = None
+                # If the file had metadata
+                else:
+                    # Extract original and fixed metadata to write into row
+                    for key in self.keys:
+                        row[f"{key}_og"] = og.get(key, None)
+                        row[f"{key}_fixed"] = fixed.get(key, None)
                 # Save filepath for row
                 row["file_path"] = f_path
                 # Write row into result file
@@ -211,13 +191,12 @@ class MetaFixer:
     def run(self):
         """Main method to call all main methods of the MetaFixer class"""
 
-        # Get files and their original metadata
-        if self.get_files():
-            self.get_original_metadata()
-        # Fix metadata of the retrieved files
-        self.fix_extracted_metadata()
-        # Give output CSV of results
-        self.output_results()
+        # If there are files to fix
+        if self._get_files():
+            # Extract, fix, and save fixed metadata
+            self._fix_files()
+            # Crete output fo fixing results
+            self._output_results()
 
 
 if __name__ == "__main__":
