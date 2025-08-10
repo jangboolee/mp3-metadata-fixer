@@ -1,6 +1,7 @@
-file_path,artist_og,artist_fixed,title_og,title_fixed,album_og,album_fixed,genre_og,genre_fixed
-files/부탁해요 캡틴 - Fly High(acoustic).mp3,,,트랙 20,트랙 20,SBS お願いキャプテン OST,SBS お願いキャプテン OST,ソウル,ソウル
-files/신자유 - 돌아와줘.mp3,½ÅÀÚÀ¯,신자유,돌아와줘,돌아와줘,Free Way,Free Way,가요,가요
-files/심은경 - 하얀 나비.mp3,½ÉÀº°æ,심은경,하얀 나비,하얀 나비,¼ö»óÇÑ ±×³à OST,수상한 그녀 OST,가요,가요
-files/2Pac - Hail Mary.mp3,,,,,,,,
-files/베이지 - 그리워 그리워서.mp3,º£ÀÌÁö,베이지,±×¸®¿ö ±×¸®¿ö¼­ (¶ó¿ÂVer.),그리워 그리워서 (라온Ver.),±¸¸£¹Ì ±×¸° ´Þºû (KBS2 ¿ùÈ­µå¶,,Blues,Blues
+file_path,is_fixed,artist_og,artist_fixed,title_og,title_fixed,album_og,album_fixed,genre_og,genre_fixed
+files/부탁해요 캡틴 - Fly High(acoustic).mp3,False,,,트랙 20,트랙 20,SBS お願いキャプテン OST,SBS お願いキャプテン OST,ソウル,ソウル
+files/신자유 - 돌아와줘.mp3,True,½ÅÀÚÀ¯,신자유,돌아와줘,돌아와줘,Free Way,Free Way,가요,가요
+files/심은경 - 하얀 나비.mp3,True,½ÉÀº°æ,심은경,하얀 나비,하얀 나비,¼ö»óÇÑ ±×³à OST,수상한 그녀 OST,가요,가요
+files/Bayonetta - 2008 Tokyo Game Show Trailer.mp3,False,Various Artists,Various Artists,Tokyo Game Show Promotion,Tokyo Game Show Promotion,Bayonetta Original Soundtrack,Bayonetta Original Soundtrack,Video Game,Video Game
+files/2Pac - Hail Mary.mp3,False,,,,,,,,
+files/베이지 - 그리워 그리워서.mp3,True,º£ÀÌÁö,베이지,±×¸®¿ö ±×¸®¿ö¼­ (¶ó¿ÂVer.),그리워 그리워서 (라온Ver.),±¸¸£¹Ì ±×¸° ´Þºû (KBS2 ¿ùÈ­µå¶,,Blues,Blues

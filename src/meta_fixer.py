@@ -3,7 +3,7 @@ from csv import DictWriter
 from pathlib import Path
 
 from chardet import detect
-from mutagen import id3
+from mutagen import MutagenError, id3
 from mutagen.easyid3 import EasyID3
 from tqdm import tqdm
 
@@ -82,7 +82,8 @@ class MetaFixer:
         ]
         # Create and save dictionary of metadata
         metadata = {
-            f_path: {"original": None, "fixed": None} for f_path in all_files
+            f_path: {"original": None, "fixed": None, "is_fixed": False}
+            for f_path in all_files
         }
         # Save as instance variables
         self.file_paths = all_files
@@ -121,8 +122,15 @@ class MetaFixer:
                     is_fixed = True
         # Save the fixed metadata results
         self.metadata[f_path]["fixed"] = fixed_meta
-        # Save the audio file with fixed metadta
-        audio.save()
+        try:
+            # Save the audio file with fixed metadta
+            audio.save()
+        # Catch Bayonetta error on LunarFox's PC
+        except MutagenError:
+            is_fixed = False
+
+        # Save Boolean flag for the file
+        self.metadata[f_path]["is_fixed"] = is_fixed
 
         return is_fixed
 
@@ -152,6 +160,7 @@ class MetaFixer:
 
         field_names = (
             "file_path",
+            "is_fixed",
             "artist_og",
             "artist_fixed",
             "title_og",
@@ -181,7 +190,8 @@ class MetaFixer:
                     for key in self.keys:
                         row[f"{key}_og"] = og.get(key, None)
                         row[f"{key}_fixed"] = fixed.get(key, None)
-                # Save filepath for row
+                # Save filepath and fixed flag for row
+                row["is_fixed"] = self.metadata[f_path]["is_fixed"]
                 row["file_path"] = f_path
                 # Write row into result file
                 writer.writerow(row)
